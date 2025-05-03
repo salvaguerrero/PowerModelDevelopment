@@ -2,3 +2,4 @@
 european model/**/*.csv
 european model/**/*.json
 european model/**/*.xlsm
+.DS_Store
