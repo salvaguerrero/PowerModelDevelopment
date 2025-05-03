@@ -5,5 +5,3 @@ A small Julia-based framework for simulating and minimizing total generation cos
 
 ## Stack
 - Julia Lang with JuMP + Gurobi (or other solvers)  
-# PowerModelDevelopment
-# PowerModelDevelopment
