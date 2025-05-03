@@ -1,0 +1,4 @@
+# Ignore all data files
+european model/**/*.csv
+european model/**/*.json
+european model/**/*.xlsm

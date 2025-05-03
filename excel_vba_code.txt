@@ -1,0 +1,214 @@
+Sub ExportToJSON()
+    Dim jsonString As String
+    Dim ws As Worksheet
+    Dim CSV_ws As Worksheet
+    Dim heaDict As Collection
+    Dim objDict As Collection
+    Dim rowDict As Collection
+    Dim exeDict As Collection
+    Dim dataDict As Collection
+    Dim i As Long, j As Long
+    Dim key As Variant
+    Dim objName As String
+    Dim filePath As String
+    Dim filePathCsv As String
+    
+    ' MsgBox populateNode(1, "Generators")
+    
+    Set ws = ThisWorkbook.Sheets("Execution")
+    
+
+    filePath = "/output.json"
+    If ws.Cells(7, 13).value <> "" Then
+        filePath = ws.Cells(7, 13).value
+        If Right(filePath, 5) <> ".json" Then filePath = filePath & ".json"
+    End If
+    filePath = ThisWorkbook.Path & "/" & filePath ' Adjusted for Mac
+
+    'Save CSV
+    'If LCase(ws.Cells(9, 7).value) <> "false" Then
+    '    Set CSV_ws = ThisWorkbook.Sheets(ws.Cells(9, 7).value)
+   '     filePathCsv = ws.Cells(8, 7).value
+        
+        ' Save the sheet as CSV
+  '       Application.DisplayAlerts = False ' Turn off warning alerts
+  '       CSV_ws.Copy ' Copy the worksheet to a new workbook
+  '
+  '       ActiveWorkbook.SaveAs FileName:=filePathCsv, FileFormat:=xlCSV, CreateBackup:=False
+  '       ActiveWorkbook.Close SaveChanges:=False
+  '       Application.DisplayAlerts = True ' Turn alerts back on
+  '  End If
+    
+    jsonString = "{"
+        
+    ' Read Execution header
+    Set heaDict = New Collection
+    Set exeDict = New Collection
+    Set dataDict = New Collection
+    For j = 2 To ws.Columns.Count
+        If ws.Cells(7, j).value <> "" Then
+            heaDict.Add ws.Cells(7, j).value, CStr(j - 1)
+        Else
+            Exit For
+        End If
+    Next j
+    dataDict.Add heaDict, "1"
+    ' Read Execution data
+    Set objDict = New Collection
+    Set rowDict = New Collection
+    For j = 1 To heaDict.Count
+            rowDict.Add CStr(ws.Cells(8, j + 1).value), CStr(j)
+    Next j
+    objDict.Add rowDict, CStr(1)
+        
+    dataDict.Add objDict, "2"
+    jsonString = jsonString & ConvertToJSON(dataDict, "Execution")
+
+    If ws.Cells(6, 12).value = "Objects" Then
+        For j = 13 To ws.Columns.Count
+            If ws.Cells(6, j).value <> "" Then
+                 objName = ws.Cells(6, j).value
+                Set dataDict = getData(objName)
+                 jsonString = jsonString & ConvertToJSON(dataDict, objName)
+            Else
+                Exit For
+            End If
+        Next j
+    Else
+        MsgBox "Something Happened: Object not found in cell L6 of sheet Execution"
+    End If
+    
+    
+
+    ' Remove last comma and close the JSON string
+    If Right(jsonString, 1) = "," Then jsonString = Left(jsonString, Len(jsonString) - 1)
+    jsonString = jsonString & "}"
+    
+
+    
+    ' Output the JSON to a file
+    Dim fileNum As Integer
+    fileNum = FreeFile
+    Open filePath For Output As #fileNum
+    Print #fileNum, jsonString
+    Close #fileNum
+
+    MsgBox "JSON exported to " & filePath, vbInformation
+End Sub
+
+Function populateNode(nodeId As Long, objName As String) As String
+    Dim idList As String
+    Dim nodeCol As Long
+
+    Set ws = ThisWorkbook.Sheets(objName)
+    idList = "["
+    
+    'identifiying node_id column
+    For nodeCol = 1 To ws.Columns.Count
+        If LCase(ws.Cells(1, nodeCol).value) = "node_id" Then
+            Exit For
+        ElseIf ws.Cells(1, nodeCol).value = "" Then
+            nodeCol = 0
+            Exit For
+        End If
+    Next nodeCol
+    For i = 2 To ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        If ws.Cells(i, 1).value = "" Then
+            Exit For
+        End If
+        
+        If ws.Cells(i, nodeCol).value = nodeId Then
+            idList = idList & CStr(ws.Cells(i, 1).value) & ","   '  save generators id
+        End If
+    Next i
+    
+    If Right(idList, 1) = "," Then idList = Left(idList, Len(idList) - 1)
+    idList = idList & "]"
+    
+    If idList = "[]" Then idList = 0
+
+    populateNode = idList
+End Function
+
+
+Function getData(objName As String) As Collection
+    Dim value As String
+    Set ws = ThisWorkbook.Sheets(objName)
+    'Read header
+    Set heaDict = New Collection
+    Set dataDict = New Collection
+    
+    For j = 1 To ws.Columns.Count
+        If ws.Cells(1, j).value <> "" And ws.Cells(1, j).value <> "DATA_END" Then
+            heaDict.Add ws.Cells(1, j).value, CStr(j)
+        Else
+            Exit For
+        End If
+    Next j
+    dataDict.Add heaDict, "1"
+    'Read data
+    Set objDict = New Collection
+    For i = 2 To ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        If ws.Cells(i, 1).value = "" And ws.Cells(1, j).value <> "DATA_END" Then
+            Exit For
+        End If
+        Set rowDict = New Collection
+        For j = 1 To heaDict.Count
+'        MsgBox heaDict.item(j)
+'        MsgBox InStr(heaDict.item(j), "_id")
+                'If objName = "Nodes" & InStr(heaDict.item(j), "_id") > 0 Then
+                 '   value = populateNode(ws.Cells(i, 1).value, Left(heaDict.item(j), Len(heaDict.item(j)) - 1))
+                '  MsgBox value
+                'Else
+                    value = CStr(ws.Cells(i, j).value)
+                'End If
+                rowDict.Add value, CStr(j)
+        Next j
+        objDict.Add rowDict, CStr(i - 1)
+    Next i
+        
+    dataDict.Add objDict, "2"
+    Set getData = dataDict
+End Function
+
+
+Function ConvertToJSON(dataDict As Collection, objName As String) As String
+    Dim json As String
+    Dim key As Variant
+    Dim item As Variant
+    Dim tempDict As Collection
+    Dim heaDict As Collection
+    Dim i As Long
+
+    Set heaDict = dataDict(1)
+    objName = LCase(objName)
+    json = """" & objName & """:{"
+    For i = 1 To dataDict(2).Count ' for each object
+        
+        Set tempDict = dataDict(2).item(i)
+        If objName <> "Execution" Then
+            json = json & """" & tempDict.item(1) & """:{"
+            For j = 2 To heaDict.Count       ' for each boject property
+                json = json & """" & heaDict.item(j) & """: """ & tempDict.item(j) & """" & ","
+            Next j
+            If Right(json, 1) = "," Then json = Left(json, Len(json) - 1)
+            json = json & "},"
+        Else
+            For j = 1 To heaDict.Count       ' for each boject property
+                json = json & """" & heaDict.item(j) & """: """ & tempDict.item(j) & """" & ","
+            Next j
+            If Right(json, 1) = "," Then json = Left(json, Len(json) - 1)
+            
+        End If
+
+    Next i
+
+    ' Remove last comma and close the JSON string
+    If Right(json, 1) = "," Then json = Left(json, Len(json) - 1)
+    json = json & "},"
+
+    ConvertToJSON = json
+End Function
+
+
+
